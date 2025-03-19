@@ -4,7 +4,8 @@ import main as module_0
 
 
 def test_case_0():
-    list_0 = []
-    var_0 = module_0.plus(list_0, list_0)
+    str_0 = 'UOM,xYI/uL"'
+    var_0 = module_0.plus(str_0, str_0)
+    assert var_0 == 'UOM,xYI/uL"UOM,xYI/uL"'
     assert module_0.a == 3
-    assert module_0.b == 1
+    assert module_0.b == 2

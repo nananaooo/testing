@@ -21,8 +21,14 @@ class CodeChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
         current_time = time.time()  # 현재 시간
 
+        # `test_output` 폴더 내 변경은 무시하고, main.py 파일만 수정된 경우 반응
+        if TEST_OUTPUT_PATH in event.src_path:
+            return
+        if not event.src_path.endswith("main.py"):
+            return
+
         # 파일이 수정된 직후, 테스트 실행 중이면 무시
-        if event.src_path.endswith(".py") and not self.test_running and current_time - self.last_run_time > self.debounce_time:
+        if event.src_path.endswith("main.py") and not self.test_running and current_time - self.last_run_time > self.debounce_time:
             print(f"\n🔄 파일 변경 감지: {event.src_path}")
             print("🚀 Pynguin으로 테스트 케이스 생성 중...")
 
@@ -54,7 +60,8 @@ class CodeChangeHandler(FileSystemEventHandler):
 
             # 테스트 완료 후 1초 대기 후 다시 실행할 수 있도록 설정
             time.sleep(1)
-            self.test_running = False  # 테스트 완료 후 상태 변경
+            self.test_running = False
+
 
 if __name__ == "__main__":
     event_handler = CodeChangeHandler()
