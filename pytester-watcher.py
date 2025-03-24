@@ -11,6 +11,10 @@ TEST_OUTPUT_PATH = "/Users/gimminjae/Documents/testing/test_output"  # 테스트
 
 # `pytest`의 절대 경로를 지정하는 방법
 PYTEST_PATH = "/opt/anaconda3/envs/tf_env_310/bin/pytest"  # `pytest` 경로
+PYNGUIN_PATH = "/opt/anaconda3/envs/tf_env_310/bin/pynguin"  # `pynguin` 경로
+
+# 타임아웃 시간 (초)
+TIMEOUT = 60  # 10분 (600초)
 
 class CodeChangeHandler(FileSystemEventHandler):
     def __init__(self):
@@ -24,35 +28,52 @@ class CodeChangeHandler(FileSystemEventHandler):
         # `test_output` 폴더 내 변경은 무시하고, main.py 파일만 수정된 경우 반응
         if TEST_OUTPUT_PATH in event.src_path:
             return
-        if not event.src_path.endswith("main.py"):
+        if not event.src_path.endswith(".py"):
             return
 
         # 파일이 수정된 직후, 테스트 실행 중이면 무시
-        if event.src_path.endswith("main.py") and not self.test_running and current_time - self.last_run_time > self.debounce_time:
+        if not self.test_running and current_time - self.last_run_time > self.debounce_time:
             print(f"\n🔄 파일 변경 감지: {event.src_path}")
             print("🚀 Pynguin으로 테스트 케이스 생성 중...")
 
             # `PYNGUIN_DANGER_AWARE` 환경 변수 설정
             os.environ['PYNGUIN_DANGER_AWARE'] = '1'  # 환경 변수 설정
 
-            # Pynguin을 사용하여 테스트 케이스 생성
-            subprocess.run(
-                [
-                    "pynguin", "--project-path", PROJECT_PATH, "--module-name", MODULE_NAME,
-                    "--output-path", TEST_OUTPUT_PATH
-                ]
-            )
+            try:
+                # Pynguin을 사용하여 테스트 케이스 생성
+                result = subprocess.run(
+                    [
+                        PYNGUIN_PATH, "--project-path", PROJECT_PATH, "--module-name", MODULE_NAME,
+                        "--output-path", TEST_OUTPUT_PATH, "--population", "50", "--maximum_iterations", "200"
+                    ],
+                    capture_output=True, text=True, timeout=TIMEOUT  # 타임아웃 설정
+                )
 
-            print("✅ 테스트 케이스 생성 완료!")
+                # Pynguin 실행 결과 확인
+                print(result.stdout)
+                if result.stderr:
+                    print("Error:", result.stderr)
 
-            print("🚀 pytest 실행 중...")
-            # `pytest`를 사용하여 테스트 실행 (경로를 명시적으로 지정)
-            subprocess.run(
-                [
-                    PYTEST_PATH, TEST_OUTPUT_PATH  # `pytest` 경로를 명시적으로 지정
-                ], env={"PYTHONPATH": PROJECT_PATH}  # 환경변수 설정
-            )
-            print("✅ 테스트 실행 완료!")
+                print("✅ 테스트 케이스 생성 완료!")
+
+                print("🚀 pytest 실행 중...")
+                # `pytest`를 사용하여 테스트 실행 (경로를 명시적으로 지정)
+                result = subprocess.run(
+                    [
+                        PYTEST_PATH, TEST_OUTPUT_PATH  # `pytest` 경로를 명시적으로 지정
+                    ],
+                    capture_output=True, text=True, env={"PYTHONPATH": PROJECT_PATH}  # 환경변수 설정
+                )
+
+                # pytest 실행 결과 확인
+                print(result.stdout)
+                if result.stderr:
+                    print("Error:", result.stderr)
+
+                print("✅ 테스트 실행 완료!")
+
+            except subprocess.TimeoutExpired:
+                print("❌ 테스트 케이스 생성 실패")
 
             # 마지막 실행 시간을 갱신하고, 테스트가 실행 중임을 설정
             self.last_run_time = current_time
@@ -68,7 +89,7 @@ if __name__ == "__main__":
     observer = Observer()
     observer.schedule(event_handler, PROJECT_PATH, recursive=True)  # 전체 프로젝트 경로 감시
 
-    print("👀 파일 변경 감지 중...")
+    print("파일 변경 감지 중...")
     observer.start()
 
     try:
